@@ -84,3 +84,7 @@ bun run build     # dist/backend.js, dist/frontend.js 생성 — 변경 후 dist
 - `src/qr-import.ts` — SillyTavern QR JSON → 내부 형식
 - `src/backend.ts` — 저장(사용자별), 실행, Lumiverse API 연결
 - `src/frontend.ts` — 입력창 위 버튼 줄, QR 탭, 입력창 연동
+
+## 라이선스
+
+[MIT](LICENSE) © 2026 mallang0723
