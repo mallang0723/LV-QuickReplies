@@ -18,12 +18,13 @@ function fakeHost(inputAnswer: string | null, genAnswer = 'GENERATED'): { host: 
   const log: Log = { inputs: [], toasts: [], gens: [], messages: [], vars: new Map() };
   const key = (scope: string, k: string) => `${scope}:${k}`;
   const host: Host = {
-    // Minimal macro engine: {{char}}, {{user}}, {{getvar::x}}. Unknown macros stay as-is.
+    // Like Lumiverse: {{char}} and {{user}} resolve, but {{getvar::x}} always reads an
+    // empty per-evaluation scope (it cannot see /setvar values). Unknown macros stay as-is.
     async resolveMacros(text) {
       return text
         .replace(/\{\{char\}\}/g, 'Alice')
         .replace(/\{\{user\}\}/g, 'Bob')
-        .replace(/\{\{getvar::([^}]+)\}\}/g, (_, k) => log.vars.get(key('local', k)) ?? '');
+        .replace(/\{\{getvar::([^}]+)\}\}/g, '');
     },
     async input(prompt) {
       log.inputs.push(prompt);
@@ -167,6 +168,12 @@ describe('runtime rules', () => {
     expect(log.vars.get('local:x')).toBe('');
     await runScript('/pass abc || /setvar key=y {{pipe}}', host);
     expect(log.vars.get('local:y')).toBe('abc');
+  });
+
+  test('variable macros read /setvar values; inserted values are not resolved again', async () => {
+    const { host } = fakeHost('');
+    expect(await runScript('/setvar key=a {{char}}! | /setglobalvar key=g G || /pass [{{getvar::a}},{{getglobalvar::g}},{{var::a}},{{user}}]', host)).toBe('[Alice!,G,Alice!,Bob]');
+    expect(await runScript('/input q | /setvar key=b {{pipe}} || /pass [{{getvar::b}}]', fakeHost('{{char}}').host)).toBe('[{{char}}]');
   });
 
   test('pipe content is not macro-resolved', async () => {

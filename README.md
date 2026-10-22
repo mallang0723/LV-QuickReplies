@@ -32,7 +32,7 @@ SillyTavern의 Quick Reply(QR) 내보내기 파일(`.json`)을 [Lumiverse](https
 | `/echo 문장` | 알림(toast). `severity=info/success/warning/error` |
 | `/gen 지시문` | 현재 채팅의 프롬프트(캐릭터·대화 기록·월드인포·프리셋)에 지시문을 덧붙여 생성하고, 결과를 다음 명령어로 넘김 |
 | `/genraw 지시문` | 지시문만 보내 생성 |
-| `/sendas name=… 내용` | 캐릭터 메시지로 추가 (현재 채팅의 캐릭터 이름으로 들어감) |
+| `/sendas name=… 내용` | 캐릭터 메시지로 추가 (화면에는 현재 채팅의 캐릭터 이름으로 표시) |
 | `/sys 내용` | 시스템 메시지로 추가 (AI에게도 보임) |
 | `/comment 내용` | 시스템 메시지로 추가하고 숨김 처리 (AI 프롬프트에서 빠짐) |
 | `/send 내용` | 사용자 메시지로 추가 (답변 생성 없음) |
@@ -50,16 +50,29 @@ SillyTavern의 Quick Reply(QR) 내보내기 파일(`.json`)을 [Lumiverse](https
 ## SillyTavern과 다른 점
 
 - `/gen`의 지시문은 기본적으로 프롬프트 끝에 **system** 역할로 붙습니다(SillyTavern 기본값과 같음). 쓰는 모델이 중간의 system 메시지를 잘 처리하지 못하면 QR 탭에서 **/gen 지시문 역할**을 `user`로 바꾸세요.
-- `/sendas name=`의 이름은 쓰이지 않고, 현재 채팅의 캐릭터 이름으로 들어갑니다(Lumiverse API에 이름을 지정하는 기능이 없음).
+- `/sendas name=`의 이름은 쓰이지 않습니다. Lumiverse 확장 API에는 메시지 이름을 지정하는 기능이 없고, 확장이 추가한 캐릭터 메시지의 저장 이름은 `Assistant`로 고정됩니다. 화면에는 현재 채팅의 캐릭터 이름으로 표시됩니다.
+- `{{getvar::}}`, `{{getglobalvar::}}`, `{{var::}}`는 확장이 직접 풉니다. Lumiverse 매크로 엔진은 매번 빈 변수 상태에서 시작해서 `/setvar` 값을 읽지 못하기 때문입니다. 나머지 매크로는 Lumiverse가 풉니다.
+- 입력창 연동(일반 문장 QR, `/setinput`, `/trigger`): Lumiverse에 입력창 API(`ctx.composer`, composer-v1)가 있으면 그것을 쓰고, 없으면 입력창(`textarea[name="chat-message"]`)과 전송 버튼을 직접 조작합니다. 현재 Lumiverse main(1.2.5)에는 이 API가 없어 직접 조작 방식으로 동작하므로, Lumiverse 화면 구조가 바뀌면 이 세 기능이 깨질 수 있습니다.
 - QR 자동 실행 옵션(`executeOnUser`, `executeOnAi`, `executeOnChatChange` 등)과 컨텍스트 메뉴(`contextList`)는 아직 지원하지 않습니다. 가져올 때 무시됩니다.
 - FontAwesome 아이콘(`icon`)은 표시하지 않고, 버튼에는 항상 이름(label)을 씁니다.
 - QR 하나가 실행 중일 때는 다른 QR을 실행할 수 없습니다.
+
+## 검증 기록
+
+- 자동 테스트(`bun test`): 파서·런타임·가져오기 23개. 샘플 QR 두 개(`tests/fixtures/`)로 입력·취소 흐름을 검증합니다.
+- 실제 Lumiverse(main `98b2e95`, 1.2.5)를 로컬에서 띄우고, 가짜 OpenAI 호환 서버를 연결해 브라우저로 확인한 항목:
+  - Import Local 설치와 권한 허용 후 확장 시작. 설치 시 코드 검사기에서 차단 항목 0건
+  - QR 탭 열기(Extras 메뉴), `.json` 두 개 가져오기, 입력창 위 버튼 표시
+  - 모험 일지 QR: 주제 입력 → `/gen` 요청이 캐릭터 설명이 포함된 전체 프롬프트 + 끝의 system 지시문(주제·`{{char}}` 반영)으로 감 → 결과가 캐릭터 메시지로 추가됨
+  - 짧은 대본 QR: 취소 시 "대본 작성을 취소했어요." 알림만 뜨고 AI 호출 없음 / 주제 입력 시 결과가 숨김 코멘트로 추가되고, 다음 일반 답변 프롬프트에서 빠짐
+  - 일반 문장 QR 전송, `/setinput`, `/send` + `/trigger`
+- 확인하지 못한 것: 실제 AI 모델 응답, ■ 중지 버튼으로 생성 도중 멈추기(자동 테스트로만 확인), 모바일 화면, Lumiverse staging 브랜치
 
 ## 개발
 
 ```bash
 bun install
-bun test          # 파서·런타임·가져오기 테스트 (샘플 QR 두 개로 검증)
+bun test          # 파서·런타임·가져오기 테스트
 bun run typecheck
 bun run build     # dist/backend.js, dist/frontend.js 생성 — 변경 후 dist도 함께 커밋
 ```

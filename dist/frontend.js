@@ -78,50 +78,70 @@ function setup(ctx) {
   const toBackend = (msg) => ctx.sendToBackend(msg);
   const notify = (kind, text) => toBackend({ type: "notify", kind, text });
   const removeStyle = ctx.dom.addStyle(CSS);
-  const composer = () => ctx.composer;
-  function composerReady() {
+  const composer = () => ctx.composer?.getState().mounted ? ctx.composer : null;
+  const textarea = () => document.querySelector('textarea[name="chat-message"]');
+  const sendButton = () => document.querySelector('button[class*="_sendBtn_"]');
+  const tick = () => new Promise((r) => setTimeout(r, 60));
+  function currentChatId() {
     const c = composer();
-    return !!c && c.getState().mounted;
+    if (c)
+      return c.getState().chatId;
+    const m = /^\/chat\/([^/?#]+)/.exec(location.pathname);
+    return m ? decodeURIComponent(m[1]) : null;
   }
-  async function sendComposer() {
-    const c = composer();
-    if (!c)
-      throw new Error("이 Lumiverse 버전은 입력창 연동(composer-v1)을 지원하지 않습니다.");
-    await Promise.race([c.send(), new Promise((r) => setTimeout(r, 1500))]);
+  function inputText() {
+    return composer()?.getState().text ?? textarea()?.value ?? "";
   }
-  async function applyPlain(action) {
+  function setInputText(text) {
     const c = composer();
-    if (!c || !composerReady()) {
-      notify("warning", "입력창이 보이지 않아 Quick Reply 내용을 넣지 못했습니다.");
+    if (c) {
+      c.setText(text);
+      c.focus();
       return;
     }
-    const current = c.getState().text;
-    let text = action.text;
-    if (action.injectInput && current.length > 0) {
-      text = action.placeBeforeInput ? `${action.text} ${current}` : `${current} ${action.text}`;
+    const ta = textarea();
+    if (!ta)
+      throw new Error("입력창을 찾지 못했습니다. 채팅 화면에서 실행하세요.");
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(ta, text);
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    ta.focus();
+  }
+  async function pressSend() {
+    const c = composer();
+    if (c) {
+      await Promise.race([c.send(), new Promise((r) => setTimeout(r, 1500))]);
+      return;
     }
-    c.setText(text);
-    c.focus();
-    if (action.send) {
-      try {
-        await sendComposer();
-      } catch (e) {
-        notify("error", `전송 실패: ${e instanceof Error ? e.message : String(e)}`);
+    await tick();
+    const b = sendButton();
+    if (!b)
+      throw new Error("전송 버튼을 찾지 못했습니다.");
+    if (b.disabled)
+      throw new Error("답변 생성 중이라 전송할 수 없습니다.");
+    b.click();
+  }
+  async function applyPlain(action) {
+    try {
+      const current = inputText();
+      let text = action.text;
+      if (action.injectInput && current.length > 0) {
+        text = action.placeBeforeInput ? `${action.text} ${current}` : `${current} ${action.text}`;
       }
+      setInputText(text);
+      if (action.send)
+        await pressSend();
+    } catch (e) {
+      notify("error", `Quick Reply 전송 실패: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   async function composerAction(reqId, action, text) {
     try {
-      const c = composer();
-      if (!c || !composerReady())
-        throw new Error("입력창이 보이지 않습니다. 채팅 화면에서 실행하세요.");
       if (action === "set") {
-        c.setText(text ?? "");
-        c.focus();
+        setInputText(text ?? "");
       } else {
-        if (c.getState().text.trim())
+        if (inputText().trim())
           throw new Error("입력창에 작성 중인 글이 있어 /trigger 를 실행하지 않았습니다.");
-        await sendComposer();
+        await pressSend();
       }
       toBackend({ type: "composer_result", reqId, ok: true });
     } catch (e) {
@@ -131,8 +151,7 @@ function setup(ctx) {
   function runQr(set, qr) {
     if (runningLabel)
       return;
-    const state = composer()?.getState();
-    toBackend({ type: "run", setId: set.id, qrId: qr.id, chatId: state?.mounted ? state.chatId : null, input: state?.text ?? "" });
+    toBackend({ type: "run", setId: set.id, qrId: qr.id, chatId: currentChatId(), input: inputText() });
   }
   function save() {
     toBackend({ type: "save_store", store });

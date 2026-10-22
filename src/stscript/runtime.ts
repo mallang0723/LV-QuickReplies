@@ -55,8 +55,6 @@ interface CommandResult {
 
 type Handler = (ctx: Ctx, args: Record<string, ArgValue>, unnamed: ArgValue | null, raw: Command) => Promise<string>;
 
-const PIPE_TOKEN = '\uE000PIPE\uE000';
-
 export const SUPPORTED_COMMANDS = [
   'input', 'setvar', 'getvar', 'addvar', 'incvar', 'decvar', 'flushvar',
   'setglobalvar', 'getglobalvar', 'addglobalvar', 'incglobalvar', 'decglobalvar', 'flushglobalvar',
@@ -113,12 +111,29 @@ async function runClosure(ctx: Ctx, closure: Closure, pipe: string): Promise<Com
   return { pipe: current };
 }
 
-/** Replace {{pipe}} and resolve Lumiverse macros. The pipe value itself is not macro-resolved. */
+const VAR_MACRO = /\{\{(getvar|getglobalvar|var)::([^{}]+?)\}\}/gi;
+const TOKEN = /\uE000(\d+)\uE000/g;
+
+/**
+ * Replace {{pipe}} and the variable macros, then resolve the remaining Lumiverse macros.
+ * Variable macros are read here because Lumiverse's macro engine starts every evaluation
+ * with empty local variables, so it cannot see values written by /setvar.
+ * Inserted values are not macro-resolved again.
+ */
 async function substitute(ctx: Ctx, text: string, pipe: string): Promise<string> {
   if (!text.includes('{{')) return text;
-  const withToken = text.replace(/\{\{pipe\}\}/gi, PIPE_TOKEN);
-  const resolved = withToken.includes('{{') ? await ctx.host.resolveMacros(withToken) : withToken;
-  return resolved.split(PIPE_TOKEN).join(pipe);
+  const values: string[] = [];
+  const token = (value: string) => {
+    values.push(value);
+    return `\uE000${values.length - 1}\uE000`;
+  };
+  let out = text.replace(/\{\{pipe\}\}/gi, () => token(pipe));
+  const keys = [...out.matchAll(VAR_MACRO)].map((m) => ({ scope: m[1]!.toLowerCase() === 'getglobalvar' ? 'global' as const : 'local' as const, key: m[2]!.trim() }));
+  const read = await Promise.all(keys.map((k) => ctx.host.getVar(k.scope, k.key)));
+  let i = 0;
+  out = out.replace(VAR_MACRO, () => token(read[i++] ?? ''));
+  if (out.includes('{{')) out = await ctx.host.resolveMacros(out);
+  return out.replace(TOKEN, (_m, n: string) => values[Number(n)] ?? '');
 }
 
 function str(v: ArgValue | null | undefined): string {

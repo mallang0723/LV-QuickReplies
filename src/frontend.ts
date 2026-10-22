@@ -74,53 +74,76 @@ export function setup(ctx: SpindleFrontendContext) {
   const removeStyle = ctx.dom.addStyle(CSS);
 
   // ---- composer ----
+  // ctx.composer (composer-v1) is newer than current Lumiverse releases. Without it,
+  // the chat input is driven through its DOM: the message textarea and the send button.
 
-  const composer = () => ctx.composer;
+  const composer = () => (ctx.composer?.getState().mounted ? ctx.composer : null);
+  const textarea = () => document.querySelector<HTMLTextAreaElement>('textarea[name="chat-message"]');
+  const sendButton = () => document.querySelector<HTMLButtonElement>('button[class*="_sendBtn_"]');
+  const tick = () => new Promise<void>((r) => setTimeout(r, 60));
 
-  function composerReady(): boolean {
+  function currentChatId(): string | null {
     const c = composer();
-    return !!c && c.getState().mounted;
+    if (c) return c.getState().chatId;
+    const m = /^\/chat\/([^/?#]+)/.exec(location.pathname);
+    return m ? decodeURIComponent(m[1]!) : null;
   }
 
-  async function sendComposer(): Promise<void> {
+  function inputText(): string {
+    return composer()?.getState().text ?? textarea()?.value ?? '';
+  }
+
+  function setInputText(text: string): void {
     const c = composer();
-    if (!c) throw new Error('이 Lumiverse 버전은 입력창 연동(composer-v1)을 지원하지 않습니다.');
-    // send() may only settle after the reply; failures to start show up quickly.
-    await Promise.race([c.send(), new Promise<void>((r) => setTimeout(r, 1500))]);
+    if (c) {
+      c.setText(text);
+      c.focus();
+      return;
+    }
+    const ta = textarea();
+    if (!ta) throw new Error('입력창을 찾지 못했습니다. 채팅 화면에서 실행하세요.');
+    // React tracks the value; set it through the native setter so onChange sees it.
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(ta, text);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    ta.focus();
+  }
+
+  /** Press Send. With an empty input this asks for a fresh reply. */
+  async function pressSend(): Promise<void> {
+    const c = composer();
+    if (c) {
+      // send() may only settle after the reply; failures to start show up quickly.
+      await Promise.race([c.send(), new Promise<void>((r) => setTimeout(r, 1500))]);
+      return;
+    }
+    await tick();
+    const b = sendButton();
+    if (!b) throw new Error('전송 버튼을 찾지 못했습니다.');
+    if (b.disabled) throw new Error('답변 생성 중이라 전송할 수 없습니다.');
+    b.click();
   }
 
   async function applyPlain(action: PlainAction): Promise<void> {
-    const c = composer();
-    if (!c || !composerReady()) {
-      notify('warning', '입력창이 보이지 않아 Quick Reply 내용을 넣지 못했습니다.');
-      return;
-    }
-    const current = c.getState().text;
-    let text = action.text;
-    if (action.injectInput && current.length > 0) {
-      text = action.placeBeforeInput ? `${action.text} ${current}` : `${current} ${action.text}`;
-    }
-    c.setText(text);
-    c.focus();
-    if (action.send) {
-      try {
-        await sendComposer();
-      } catch (e) {
-        notify('error', `전송 실패: ${e instanceof Error ? e.message : String(e)}`);
+    try {
+      const current = inputText();
+      let text = action.text;
+      if (action.injectInput && current.length > 0) {
+        text = action.placeBeforeInput ? `${action.text} ${current}` : `${current} ${action.text}`;
       }
+      setInputText(text);
+      if (action.send) await pressSend();
+    } catch (e) {
+      notify('error', `Quick Reply 전송 실패: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   async function composerAction(reqId: string, action: 'set' | 'trigger', text?: string): Promise<void> {
     try {
-      const c = composer();
-      if (!c || !composerReady()) throw new Error('입력창이 보이지 않습니다. 채팅 화면에서 실행하세요.');
       if (action === 'set') {
-        c.setText(text ?? '');
-        c.focus();
+        setInputText(text ?? '');
       } else {
-        if (c.getState().text.trim()) throw new Error('입력창에 작성 중인 글이 있어 /trigger 를 실행하지 않았습니다.');
-        await sendComposer();
+        if (inputText().trim()) throw new Error('입력창에 작성 중인 글이 있어 /trigger 를 실행하지 않았습니다.');
+        await pressSend();
       }
       toBackend({ type: 'composer_result', reqId, ok: true });
     } catch (e) {
@@ -132,8 +155,7 @@ export function setup(ctx: SpindleFrontendContext) {
 
   function runQr(set: QuickReplySet, qr: QuickReply): void {
     if (runningLabel) return;
-    const state = composer()?.getState();
-    toBackend({ type: 'run', setId: set.id, qrId: qr.id, chatId: state?.mounted ? state.chatId : null, input: state?.text ?? '' });
+    toBackend({ type: 'run', setId: set.id, qrId: qr.id, chatId: currentChatId(), input: inputText() });
   }
 
   function save(): void {
