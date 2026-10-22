@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "name": "ST Quick Replies",
+  "identifier": "st_quick_replies",
+  "author": "mallang0723",
+  "github": "https://github.com/mallang0723/test1",
+  "homepage": "https://github.com/mallang0723/test1",
+  "description": "SillyTavern Quick Reply(.json)를 가져와 입력창 위 버튼으로 실행합니다. /input, /setvar, /if, /gen, /sendas, /comment 등 STscript 일부를 지원합니다.",
+  "permissions": ["generation", "chat_mutation"],
+  "entry_backend": "dist/backend.js",
+  "entry_frontend": "dist/frontend.js"
+}
