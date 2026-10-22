@@ -5,7 +5,7 @@ SillyTavern의 Quick Reply(QR) 내보내기 파일(`.json`)을 [Lumiverse](https
 ## 설치
 
 1. Lumiverse → 서랍(drawer) → **Extensions** → **Add Extension**
-2. *Install from Source*에 `https://github.com/mallang0723/<REPO>` 입력 → **Install**
+2. *Install from Source*에 `https://github.com/mallang0723/LV-QuickReplies` 입력 → **Install**
 3. 설치된 확장의 **Enable**을 켜고, 권한 두 개를 허용합니다.
    - `generation`: `/gen`, `/genraw`, `/trigger`, 일반 문장 QR 전송
    - `chat_mutation`: `/sendas`, `/sys`, `/comment`, `/send`로 채팅에 메시지 추가
