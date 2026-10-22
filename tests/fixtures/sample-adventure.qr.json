@@ -1,0 +1,18 @@
+{
+  "id": 7,
+  "showLabel": false,
+  "label": "🧑‍🚀 모험 일지",
+  "title": "",
+  "message": "/input 어떤 모험을 기록할까요? | /setvar key=trip_theme {{pipe}} ||\n\n/if left={{getvar::trip_theme}} right=\"\" rule=eq {:\n/echo color=blue \"모험 일지 작성을 그만둡니다.\" |\n/abort\n:} ||\n\n/gen <System>\nStep outside the current scene for a moment. Write an adventure journal kept by {{char}} about the theme below.\n\n<Theme>\nTheme: \"{{getvar::trip_theme}}\"\n</Theme>\n\n<Journal Rules>\n- Split the journal into 3-5 dated entries, each under a short **bold** heading.\n- Mix plain narration with small lists (supplies, weather, distance walked) wherever it reads naturally.\n- Mention {{user}} at least once, as a travel companion or as the person the journal is written for.\n- Dialogue may be written either way: \"Left or right?\" / \"Left.\" or as a short script line.\n- Keep it light: no grim outcomes, and close with the next destination.\n</Journal Rules>\n\nExample heading: **Day 1: The Lantern Market**\n\nNow write the journal for \"{{getvar::trip_theme}}\". Use the language of the conversation and output only the journal.\n</System> | /sendas name=\"{{char}}\"",
+  "preventAutoExecute": true,
+  "contextList": [],
+  "isHidden": false,
+  "executeOnStartup": false,
+  "executeOnUser": false,
+  "executeOnAi": false,
+  "executeOnChatChange": false,
+  "executeOnGroupMemberDraft": false,
+  "executeOnNewChat": false,
+  "executeBeforeGeneration": false,
+  "automationId": ""
+}

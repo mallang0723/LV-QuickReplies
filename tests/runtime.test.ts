@@ -81,16 +81,19 @@ describe('sample Quick Reply: 모험 일지 (/gen | /sendas)', () => {
   });
 
   test('topic entered: generates with the topic and posts as the character', async () => {
-    const { host, log } = fakeHost('비 오는 날의 데이트', 'RESULT TEXT');
+    const { host, log } = fakeHost('비 오는 항구 도시', 'RESULT TEXT');
     await runScript(qr.message, host);
     expect(log.inputs).toEqual(['어떤 모험을 기록할까요?']);
-    expect(log.vars.get('local:trip_theme')).toBe('비 오는 날의 데이트');
+    expect(log.vars.get('local:trip_theme')).toBe('비 오는 항구 도시');
     expect(log.gens).toHaveLength(1);
     const prompt = log.gens[0]!.prompt;
     expect(prompt.startsWith('<System>')).toBe(true);
     expect(prompt.endsWith('</System>')).toBe(true);
-    expect(prompt).toContain('Theme: "비 오는 날의 데이트"');
+    expect(prompt).toContain('Theme: "비 오는 항구 도시"');
     expect(prompt).toContain('adventure journal kept by Alice');
+    expect(prompt).toContain('Mention Bob at least once');
+    expect(prompt).toContain('"Left or right?" / "Left."');
+    expect(prompt).toContain('Now write the journal for "비 오는 항구 도시".');
     expect(prompt).not.toContain('{{getvar::trip_theme}}');
     expect(log.gens[0]!.as).toBe('system');
     expect(log.messages).toEqual([['char', 'RESULT TEXT']]);

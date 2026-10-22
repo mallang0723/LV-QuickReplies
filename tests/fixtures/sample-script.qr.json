@@ -1,0 +1,19 @@
+{
+  "id": 5,
+  "icon": "",
+  "showLabel": true,
+  "label": "📝 짧은 대본",
+  "title": "",
+  "message": "/input 대본의 소재는? (장소나 사건 한 줄) | /setvar key=소재 {{pipe}} ||\n\n/if left={{getvar::소재}} right=\"\" rule=eq {:\n\n    /echo color=blue \"대본 작성을 취소했어요.\" |\n\n    /abort :} ||\n\n/gen <System> Hold the roleplay for a moment and write a short stage script. Subject: [{{getvar::소재}}]\n\nUse the characters and the situation built up so far. Rules:\n\n- Start directly with the script; no preface such as 'Sure, here it is'.\n- Write 3-4 scenes, each under a Markdown heading (### Scene 1, ...).\n- Every scene must relate to {{getvar::소재}}.\n- Use only character lines, bracketed stage directions, and one-line scene notes.\n- Keep each character's usual way of speaking.\n</System> |\n/comment ",
+  "preventAutoExecute": false,
+  "contextList": [],
+  "isHidden": false,
+  "executeOnStartup": false,
+  "executeOnUser": false,
+  "executeOnAi": false,
+  "executeOnChatChange": false,
+  "executeOnGroupMemberDraft": false,
+  "executeOnNewChat": false,
+  "executeBeforeGeneration": false,
+  "automationId": ""
+}
