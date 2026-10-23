@@ -6,6 +6,7 @@ import { importQuickReplies, LOOSE_SET_NAME, newSet } from './qr-import';
 import { emptyStore, type QuickReply, type QuickReplySet, type Settings, type Store, type ToBackend, type ToFrontend, DEFAULT_SETTINGS } from './shared';
 import { ParseError } from './stscript/parser';
 import { type Host, type MessageKind, runScript, ScriptAbort, ScriptError } from './stscript/runtime';
+import { describeHostError, isPermissionError } from './host-errors';
 
 const STORE_PATH = 'quick-replies.json';
 const COMPOSER_TIMEOUT_MS = 15_000;
@@ -225,7 +226,11 @@ async function run(userId: string, sessionId: string | undefined, msg: Extract<T
     const host = makeHost(userId, msg.chatId, sessionId, store, controller.signal);
     await runScript(qr.message, host, { signal: controller.signal });
   } catch (e) {
-    if (e instanceof ScriptAbort) {
+    if (isPermissionError(e)) {
+      // Host gate threw before anything ran: privileged permissions
+      // (generation 등) need admin approval after install.
+      spindle.toast.error(describeHostError(e), { userId, title: label });
+    } else if (e instanceof ScriptAbort) {
       if (!e.quiet && e.reason) spindle.toast.warning(e.reason, { userId });
       else if (controller.signal.aborted) spindle.toast.info('실행을 중지했습니다.', { userId });
     } else if (controller.signal.aborted || (e instanceof Error && e.name === 'AbortError')) {
@@ -235,7 +240,7 @@ async function run(userId: string, sessionId: string | undefined, msg: Extract<T
     } else if (e instanceof ScriptError) {
       spindle.toast.error(e.message, { userId, title: label });
     } else {
-      spindle.toast.error(e instanceof Error ? e.message : String(e), { userId, title: label });
+      spindle.toast.error(describeHostError(e), { userId, title: label });
       spindle.log.error(`[st-qr] ${label}: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`);
     }
   } finally {
@@ -310,6 +315,6 @@ spindle.onFrontendMessage((payload, userId, frontendSessionId) => {
   if (!payload || typeof payload !== 'object' || typeof (payload as { type?: unknown }).type !== 'string') return;
   handle(payload as ToBackend, userId, frontendSessionId).catch((e) => {
     spindle.log.error(`[st-qr] ${(payload as { type: string }).type}: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`);
-    spindle.toast.error(e instanceof Error ? e.message : String(e), { userId });
+    spindle.toast.error(describeHostError(e), { userId });
   });
 });

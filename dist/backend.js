@@ -681,6 +681,31 @@ var HANDLERS = {
   }
 };
 
+// src/host-errors.ts
+var PERMISSION_LABELS = {
+  generation: "\uC0DD\uC131(generation)",
+  chat_mutation: "\uCC44\uD305 \uC218\uC815(chat_mutation)",
+  chats: "\uCC44\uD305 \uAD00\uB9AC(chats)",
+  characters: "\uCE90\uB9AD\uD130(characters)",
+  personas: "\uD398\uB974\uC18C\uB098(personas)",
+  presets: "\uD504\uB9AC\uC14B(presets)",
+  world_books: "\uC6D4\uB4DC\uBD81(world_books)",
+  ui_panels: "UI \uD328\uB110(ui_panels)",
+  cors_proxy: "\uC678\uBD80 \uC6F9 \uAC00\uC838\uC624\uAE30(cors_proxy)"
+};
+function describeHostError(e) {
+  const raw = e instanceof Error ? e.message : String(e);
+  const m = /^PERMISSION_DENIED:\s*([\w.-]+)/.exec(raw);
+  if (!m)
+    return raw;
+  const perm = m[1];
+  const label = PERMISSION_LABELS[perm] ?? perm;
+  return `\uD638\uC2A4\uD2B8 \uAD8C\uD55C\uC774 \uD5C8\uC6A9\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4: ${label}. \uD655\uC7A5 \uAD00\uB9AC \uD654\uBA74\uC5D0\uC11C \uC774 \uAD8C\uD55C\uC744 \uC2B9\uC778\uD574 \uC8FC\uC138\uC694 (generation, chat_mutation \uB4F1\uC740 \uAD00\uB9AC\uC790 \uC2B9\uC778 \uD544\uC694).`;
+}
+function isPermissionError(e) {
+  return (e instanceof Error ? e.message : String(e)).startsWith("PERMISSION_DENIED:");
+}
+
 // src/backend.ts
 var STORE_PATH = "quick-replies.json";
 var COMPOSER_TIMEOUT_MS = 15000;
@@ -886,7 +911,9 @@ async function run(userId, sessionId, msg) {
     const host = makeHost(userId, msg.chatId, sessionId, store, controller.signal);
     await runScript(qr.message, host, { signal: controller.signal });
   } catch (e) {
-    if (e instanceof ScriptAbort) {
+    if (isPermissionError(e)) {
+      spindle.toast.error(describeHostError(e), { userId, title: label });
+    } else if (e instanceof ScriptAbort) {
       if (!e.quiet && e.reason)
         spindle.toast.warning(e.reason, { userId });
       else if (controller.signal.aborted)
@@ -898,7 +925,7 @@ async function run(userId, sessionId, msg) {
     } else if (e instanceof ScriptError) {
       spindle.toast.error(e.message, { userId, title: label });
     } else {
-      spindle.toast.error(e instanceof Error ? e.message : String(e), { userId, title: label });
+      spindle.toast.error(describeHostError(e), { userId, title: label });
       spindle.log.error(`[st-qr] ${label}: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
     }
   } finally {
@@ -973,6 +1000,6 @@ spindle.onFrontendMessage((payload, userId, frontendSessionId) => {
     return;
   handle(payload, userId, frontendSessionId).catch((e) => {
     spindle.log.error(`[st-qr] ${payload.type}: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
-    spindle.toast.error(e instanceof Error ? e.message : String(e), { userId });
+    spindle.toast.error(describeHostError(e), { userId });
   });
 });
